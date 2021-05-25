@@ -19,6 +19,8 @@ func init() {
 	if len(os.Getenv("DEBUG")) > 0 {
 		log.SetLevel(log.Debug)
 	}
+
+	rootCmd.AddCommand(NewAuthCommand())
 }
 
 func Execute() {
