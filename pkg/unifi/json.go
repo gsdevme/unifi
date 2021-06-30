@@ -1,4 +1,4 @@
-package apiclient
+package unifi
 
 // generated using https://mholt.github.io/json-to-go/
 
