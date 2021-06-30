@@ -1,4 +1,4 @@
-module unifi
+module github.com/gsdevme/unifi
 
 go 1.16
 

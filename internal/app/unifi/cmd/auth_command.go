@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/gsdevme/unifi/pkg/unifi"
 	"github.com/spf13/cobra"
 	"os"
-	"unifi/pkg/unifi/apiclient"
 )
 
 func NewAuthCommand() *cobra.Command {
@@ -22,7 +22,7 @@ func NewAuthCommand() *cobra.Command {
 			username = cmd.Flag("username").Value.String()
 			password = cmd.Flag("password").Value.String()
 
-			c := apiclient.NewHttpClient(host, username, password)
+			c := unifi.NewHttpClient(host, username, password)
 			t, err := c.GetAuthToken()
 
 			if err != nil {

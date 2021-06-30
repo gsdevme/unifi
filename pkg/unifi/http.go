@@ -1,4 +1,4 @@
-package apiclient
+package unifi
 
 import (
 	"bytes"
