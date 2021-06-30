@@ -9,7 +9,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "Unifi API inspector",
-	Short: "A simple utilty to interact with the Unifi API",
+	Short: "A simple utility to interact with the Unifi API",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.HelpFunc()(cmd, args)
 	},
