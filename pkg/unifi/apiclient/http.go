@@ -16,6 +16,25 @@ const (
 	AuthCookieName = "TOKEN"
 )
 
+type clientFunc func(c *client)
+
+// WithCredentials configures the client to use the provided username/password
+// to authenticate requests.
+func WithCredentials(username, password string) clientFunc {
+	return func(c *client) {
+		c.username = username
+		c.password = password
+	}
+}
+
+// WithAuthToken configures the client to use the provided auth token
+// to authenticate requests.
+func WithAuthToken(token string) clientFunc {
+	return func(c *client) {
+		c.authToken = token
+	}
+}
+
 // HTTPClientConfig provides the configuration for Unifi clients.
 type HTTPClientConfig struct {
 	Url      string
@@ -23,7 +42,7 @@ type HTTPClientConfig struct {
 	Port     int
 }
 
-// This should probably be exported, and the clients returning an instance.
+// This should probably be exported.
 
 type client struct {
 	authToken string
@@ -34,47 +53,25 @@ type client struct {
 }
 
 // NewHTTPClient creates a new Unifi client that accesses devices via HTTP and
-// authenticates via the provided credentials.
-func NewHTTPClient(url, username, password string) Client {
+// authenticates via the provided authentication option.
+func NewHTTPClient(url string, auth clientFunc) Client {
 	// This should probably return an error?
 	if url == "" {
 		return nil
 	}
-
-	return &client{
+	c := &client{
 		http: &http.Client{
 			Transport: insecureTransport(),
 			Timeout:   time.Second * 5,
 		},
-		username:  username,
-		password:  password,
-		authToken: "",
 		config: &HTTPClientConfig{
 			Url: url,
 		},
 	}
-}
-
-// NewHTTPClient creates a new Unifi client that authenticates HTTP requests to
-// devices with the provided token.
-//
-// NOTE: This ignores the token value.
-func NewHTTPClientWithToken(url, token string) Client {
-	// This should probably return an error?
-	if url == "" {
-		return nil
-	}
-
-	return &client{
-		http: &http.Client{
-			Transport: insecureTransport(),
-			Timeout:   time.Second * 5,
-		},
-		authToken: token,
-		config: &HTTPClientConfig{
-			Url: url,
-		},
-	}
+	// even better would be to make auth `opts...clientFunc` and apply all of
+	// them.
+	auth(c)
+	return c
 }
 
 func (c client) GetAuthToken() (string, error) {
@@ -144,7 +141,9 @@ func (c client) GetActiveClients(siteId string) ([]ClientResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("authentication failed")
+		// These should return errors that are identifiable as authentication
+		// failures.
+		return nil, errors.New("failed to get an authentication token")
 	}
 
 	var clientsJson ActiveClientsJson
