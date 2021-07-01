@@ -70,6 +70,7 @@ func NewHTTPClientWithToken(url, token string) Client {
 			Transport: insecureTransport(),
 			Timeout:   time.Second * 5,
 		},
+		authToken: token,
 		config: &HTTPClientConfig{
 			Url: url,
 		},
