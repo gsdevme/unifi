@@ -11,11 +11,33 @@ import (
 	"time"
 )
 
-const UserAgent = "golang-unifi"
-const ContentType = "application/json"
-const AuthCookieName = "TOKEN"
+const (
+	UserAgent      = "golang-unifi"
+	ContentType    = "application/json"
+	AuthCookieName = "TOKEN"
+)
 
-type HttpClientConfig struct {
+type ClientFunc func(c *client)
+
+// WithCredentials configures the client to use the provided username/password
+// to authenticate requests.
+func WithCredentials(username, password string) ClientFunc {
+	return func(c *client) {
+		c.username = username
+		c.password = password
+	}
+}
+
+// WithAuthToken configures the client to use the provided auth token
+// to authenticate requests.
+func WithAuthToken(token string) ClientFunc {
+	return func(c *client) {
+		c.authToken = token
+	}
+}
+
+// HTTPClientConfig provides the configuration for Unifi clients.
+type HTTPClientConfig struct {
 	Url      string
 	IsSecure bool
 	Port     int
@@ -26,52 +48,34 @@ type client struct {
 	username  string
 	password  string
 	http      *http.Client
-	config    *HttpClientConfig
+	config    *HTTPClientConfig
 }
 
-func NewHttpClient(url string, username string, password string) Client {
-	customTransport := &(*http.DefaultTransport.(*http.Transport))
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-
-	if len(url) <= 0 {
+// NewHTTPClient creates a new Unifi client that accesses devices via HTTP and
+// authenticates via the provided authentication option.
+func NewHTTPClient(url string, auth ClientFunc) Client {
+	// This should probably return an error?
+	if url == "" {
 		return nil
 	}
-
-	return &client{
+	c := &client{
 		http: &http.Client{
-			Transport: customTransport,
+			Transport: insecureTransport(),
 			Timeout:   time.Second * 5,
 		},
-		username:  username,
-		password:  password,
-		authToken: "",
-		config: &HttpClientConfig{
+		config: &HTTPClientConfig{
 			Url: url,
 		},
 	}
-}
+	// even better would be to make auth `opts...clientFunc` and apply all of
+	// them.
+	auth(c)
 
-func NewHttpClientWithToken(url string, token string) Client {
-	customTransport := &(*http.DefaultTransport.(*http.Transport))
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-
-	if len(url) <= 0 {
-		return nil
-	}
-
-	return &client{
-		http: &http.Client{
-			Transport: customTransport,
-			Timeout:   time.Second * 5,
-		},
-		config: &HttpClientConfig{
-			Url: url,
-		},
-	}
+	return c
 }
 
 func (c client) GetAuthToken() (string, error) {
-	if len(c.authToken) > 0 {
+	if c.authToken != "" {
 		return c.authToken, nil
 	}
 
@@ -96,7 +100,7 @@ func (c client) GetAuthToken() (string, error) {
 		log.Fatal(getErr)
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return "", errors.New("authentication failed")
 	}
 
@@ -109,18 +113,17 @@ func (c client) GetAuthToken() (string, error) {
 	return "", errors.New("could not authenticate")
 }
 
-func (c client) GetActiveClients(siteId string) []ClientResponse {
-	var authToken string
-	req, err := http.NewRequest(http.MethodGet, makeUrl(c.config.Url, fmt.Sprintf(ActiveClients, siteId)), nil)
+func (c client) GetActiveClients(siteId string) ([]ClientResponse, error) {
+	requestURL := makeUrl(c.config.Url, fmt.Sprintf(ActiveClients, siteId))
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to create a request for %q: %w", requestURL, err)
 	}
 
-	authToken, err = c.GetAuthToken()
-
+	authToken, err := c.GetAuthToken()
 	if err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("getting active clients failed: %w", err)
 	}
 
 	var cookie = http.Cookie{
@@ -133,25 +136,24 @@ func (c client) GetActiveClients(siteId string) []ClientResponse {
 	req.Header.Set("Content-Type", ContentType)
 
 	resp, err := c.http.Do(req)
-
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to get auth token from %q: %w", requestURL, err)
 	}
+	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		panic(resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		// These should return errors that are identifiable as authentication
+		// failures.
+		return nil, errors.New("failed to get an authentication token")
 	}
 
 	var clientsJson ActiveClientsJson
 
-	defer resp.Body.Close()
-
 	if err := json.NewDecoder(resp.Body).Decode(&clientsJson); err != nil {
-		panic(err.Error())
+		return nil, fmt.Errorf("failed to unmarshal JSON response: %w", err)
 	}
 
 	var clients []ClientResponse
-
 	for _, client := range clientsJson.Data {
 		clients = append(clients, ClientResponse{
 			SiteId:     client.SiteID,
@@ -164,7 +166,13 @@ func (c client) GetActiveClients(siteId string) []ClientResponse {
 		})
 	}
 
-	return clients
+	return clients, nil
 
 	// https://172.16.16.1/proxy/network/api/s/default/stat/sta
+}
+
+func insecureTransport() *http.Transport {
+	transport := &(*http.DefaultTransport.(*http.Transport))
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return transport
 }
