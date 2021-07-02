@@ -17,7 +17,7 @@ type authRequestBody struct {
 
 type Client interface {
 	GetAuthToken() (string, error)
-	GetActiveClients(siteId string) []ClientResponse
+	GetActiveClients(siteId string) ([]ClientResponse, error)
 }
 
 func makeUrl(url string, uri string) string {
