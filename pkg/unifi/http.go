@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 )
@@ -87,7 +86,7 @@ func (c client) GetAuthToken() (string, error) {
 	req, err := http.NewRequest(http.MethodPost, makeUrl(c.config.Url, AuthLoginUri), bytes.NewBuffer(body))
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", UserAgent)
@@ -96,11 +95,11 @@ func (c client) GetAuthToken() (string, error) {
 	res, getErr := c.http.Do(req)
 
 	if getErr != nil {
-		log.Fatal(getErr)
+		return "", fmt.Errorf("authenication failed: %w", getErr)
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return "", errors.New("authentication failed")
+		return "", errors.New("authentication failed, invalid response code")
 	}
 
 	for _, cookie := range res.Cookies() {

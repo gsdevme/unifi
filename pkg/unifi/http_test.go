@@ -7,56 +7,84 @@ import (
 	"testing"
 )
 
-func TestSomething(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if req.URL.String() != "/api/auth/login" && req.URL.String() != "/proxy/network/api/s/wibble/stat/sta" {
-			t.Error("path is expected to be login or stat but received " + req.URL.String())
-		}
-
+func setupServer(handleAuth func(rw http.ResponseWriter)) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if req.URL.String() == "/api/auth/login" {
-			if req.Method != http.MethodPost {
-				t.Error("Request should be a POST")
-			}
-
-			http.SetCookie(rw, &http.Cookie{
-				Name:       unifi.AuthCookieName,
-				Value:      "an-amazing-token",
-			})
+			handleAuth(rw)
 
 			return
 		}
-
-		if req.URL.String() == "/proxy/network/api/s/wibble/stat/sta" {
-			if req.Method != http.MethodGet {
-				t.Error("Request should be a GET")
-			}
-
-			cookie, err := req.Cookie(unifi.AuthCookieName)
-
-			if err != nil {
-				t.Error("")
-
-				return
-			}
-
-			if cookie.Value != "an-amazing-token" {
-				t.Error("Cookie token not set as expected")
-			}
-
-			return
-		}
-
-		t.Error("blah")
 	}))
+}
 
-	defer server.Close()
+func createAuthToken(token string) func(rw http.ResponseWriter) {
+	return func(rw http.ResponseWriter) {
+		http.SetCookie(rw, &http.Cookie{
+			Name:  unifi.AuthCookieName,
+			Value: token,
+		})
 
-	c := unifi.NewHTTPClient(server.URL, unifi.WithCredentials("admin", "pass1337"))
-	_, err := c.GetActiveClients("wibble")
-
-	if err == nil {
-		t.Error("get active clients should not return an error")
-
-		return
+		rw.WriteHeader(http.StatusOK)
 	}
+}
+
+func TestClient(t *testing.T) {
+	t.Run("test authentication", func(t *testing.T) {
+		s := setupServer(createAuthToken("1337"))
+		defer s.Close()
+
+		client := unifi.NewHTTPClient(s.URL, unifi.WithCredentials("admin", "pass1337"))
+		expected := "1337"
+		was, err := client.GetAuthToken()
+
+		if err != nil {
+			t.Errorf("error recived from client: %s", err)
+		}
+
+		if was != expected {
+			t.Errorf("authenication token expected to be %s, got %s", expected, was)
+		}
+	})
+
+	t.Run("test invalid auth", func(t *testing.T) {
+		s := setupServer(func(rw http.ResponseWriter) {
+			rw.WriteHeader(http.StatusUnauthorized)
+		})
+		defer s.Close()
+
+		client := unifi.NewHTTPClient(s.URL, unifi.WithCredentials("admin", "pass1337"))
+		_, err := client.GetAuthToken()
+
+		if err == nil {
+			t.Errorf("error recived from client: %s", err)
+		}
+	})
+
+	t.Run("test no cookie", func(t *testing.T) {
+		s := setupServer(func(rw http.ResponseWriter) {
+			rw.WriteHeader(http.StatusOK)
+		})
+		defer s.Close()
+
+		client := unifi.NewHTTPClient(s.URL, unifi.WithCredentials("admin", "pass1337"))
+		_, err := client.GetAuthToken()
+
+		if err == nil {
+			t.Errorf("error recived from client: %s", err)
+		}
+	})
+
+	t.Run("get token from client func", func(t *testing.T) {
+		client := unifi.NewHTTPClient("example.com", unifi.WithAuthToken("123-123"))
+		was, err := client.GetAuthToken()
+		expected := "123-123"
+
+		if err != nil {
+			t.Errorf("error recived from client: %s", err)
+		}
+
+		if was != expected {
+			t.Errorf("authenication token expected to be %s, got %s", expected, was)
+		}
+	})
 }
