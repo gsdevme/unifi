@@ -22,7 +22,7 @@ func NewAuthCommand() *cobra.Command {
 			username = cmd.Flag("username").Value.String()
 			password = cmd.Flag("password").Value.String()
 
-			c := unifi.NewHTTPClient(host, unifi.WithCredentials(username ,password))
+			c := unifi.NewHTTPClient(host, unifi.WithCredentials(username, password))
 			t, err := c.GetAuthToken()
 
 			if err != nil {
