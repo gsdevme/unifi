@@ -67,8 +67,7 @@ func NewHTTPClient(url string, auth ClientFunc) Client {
 			Url: url,
 		},
 	}
-	// even better would be to make auth `opts...clientFunc` and apply all of
-	// them.
+
 	auth(c)
 
 	return c
@@ -113,7 +112,7 @@ func (c client) GetAuthToken() (string, error) {
 	return "", errors.New("could not authenticate")
 }
 
-func (c client) GetActiveClients(siteId string) ([]ClientResponse, error) {
+func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
 	requestURL := makeUrl(c.config.Url, fmt.Sprintf(ActiveClients, siteId))
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 
@@ -166,9 +165,7 @@ func (c client) GetActiveClients(siteId string) ([]ClientResponse, error) {
 		})
 	}
 
-	return clients, nil
-
-	// https://172.16.16.1/proxy/network/api/s/default/stat/sta
+	return &clients, nil
 }
 
 func insecureTransport() *http.Transport {
