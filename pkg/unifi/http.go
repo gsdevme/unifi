@@ -95,7 +95,7 @@ func (c client) GetAuthToken() (string, error) {
 	res, getErr := c.http.Do(req)
 
 	if getErr != nil {
-		return "", fmt.Errorf("authenication failed to %s: %w", c.config.Url, getErr)
+		return "", fmt.Errorf("authentication failed to %s: %w", c.config.Url, getErr)
 	}
 
 	if res.StatusCode != http.StatusOK {
