@@ -60,7 +60,7 @@ func NewHTTPClient(url string, auth ClientFunc) Client {
 	c := &client{
 		http: &http.Client{
 			Transport: insecureTransport(),
-			Timeout:   time.Second * 5,
+			Timeout:   time.Second * 10,
 		},
 		config: &HTTPClientConfig{
 			Url: url,
