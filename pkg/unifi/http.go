@@ -16,6 +16,14 @@ const (
 	AuthCookieName = "TOKEN"
 )
 
+type HttpAuthError struct {
+	s string
+}
+
+func (e *HttpAuthError) Error() string {
+	return e.s
+}
+
 type ClientFunc func(c *client)
 
 // WithCredentials configures the client to use the provided username/password
@@ -140,9 +148,7 @@ func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// These should return errors that are identifiable as authentication
-		// failures.
-		return nil, errors.New("failed to get an authentication token")
+		return nil, &HttpAuthError{s: "invalid authentication token"}
 	}
 
 	var clientsJson ActiveClientsJson
