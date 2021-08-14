@@ -107,7 +107,10 @@ func (c client) GetAuthToken() (string, error) {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return "", errors.New("authentication failed, invalid response code")
+		if res.StatusCode == http.StatusUnauthorized {
+			return "", &HttpAuthError{s: "unauthorized code returned, invalid authentication"}
+		}
+		return "", errors.New(fmt.Sprintf("non-success http status code returned, expected 200 got %d", res.StatusCode))
 	}
 
 	for _, cookie := range res.Cookies() {
@@ -148,7 +151,11 @@ func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, &HttpAuthError{s: "invalid authentication token"}
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, &HttpAuthError{s: "unauthorized code returned, invalid authentication"}
+		}
+
+		return nil, errors.New(fmt.Sprintf("non-success http status code returned, expected 200 got %d", resp.StatusCode))
 	}
 
 	var clientsJson ActiveClientsJson
