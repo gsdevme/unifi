@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -110,7 +109,7 @@ func (c client) GetAuthToken() (string, error) {
 		if res.StatusCode == http.StatusUnauthorized {
 			return "", &HttpAuthError{s: "unauthorized code returned, invalid authentication"}
 		}
-		return "", errors.New(fmt.Sprintf("non-success http status code returned, expected 200 got %d", res.StatusCode))
+		return "", fmt.Errorf(fmt.Sprintf("non-success http status code returned, expected 200 got %d", res.StatusCode))
 	}
 
 	for _, cookie := range res.Cookies() {
@@ -119,7 +118,7 @@ func (c client) GetAuthToken() (string, error) {
 		}
 	}
 
-	return "", errors.New("could not authenticate")
+	return "", fmt.Errorf("could not authenticate")
 }
 
 func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
@@ -155,7 +154,7 @@ func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
 			return nil, &HttpAuthError{s: "unauthorized code returned, invalid authentication"}
 		}
 
-		return nil, errors.New(fmt.Sprintf("non-success http status code returned, expected 200 got %d", resp.StatusCode))
+		return nil, fmt.Errorf(fmt.Sprintf("non-success http status code returned, expected 200 got %d", resp.StatusCode))
 	}
 
 	var clientsJson ActiveClientsJson
@@ -181,7 +180,7 @@ func (c client) GetActiveClients(siteId string) (*[]ClientResponse, error) {
 }
 
 func insecureTransport() *http.Transport {
-	transport := &(*http.DefaultTransport.(*http.Transport))
+	transport := http.DefaultTransport.(*http.Transport)
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	return transport
 }
